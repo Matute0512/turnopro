@@ -5,8 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/api_client.dart';
-import '../../services/providers/services_provider.dart';
 import '../providers/appointments_provider.dart';
+import '../../services/providers/services_provider.dart';
 
 class CreateAppointmentSheet extends ConsumerStatefulWidget {
   const CreateAppointmentSheet({super.key});
@@ -24,35 +24,78 @@ class _CreateAppointmentSheetState
 
   String? _selectedServiceId;
   DateTime? _selectedDate;
-  TimeOfDay? _selectedTime;
+  String? _selectedSlot;
 
   bool _isLoading = false;
   String? _errorMessage;
+
+  List<String> _availableSlots = [];
+  bool _isLoadingSlots = false;
 
   Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
     );
-    if (date != null) setState(() => _selectedDate = date);
+    if (date != null) {
+      setState(() {
+        _selectedDate = date;
+        _selectedSlot = null;
+      });
+      _fetchAvailableSlots();
+    }
   }
 
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time != null) setState(() => _selectedTime = time);
+  void _onServiceChanged(String? val) {
+    setState(() {
+      _selectedServiceId = val;
+      _selectedSlot = null;
+    });
+    _fetchAvailableSlots();
+  }
+
+  Future<void> _fetchAvailableSlots() async {
+    if (_selectedDate == null || _selectedServiceId == null) return;
+
+    setState(() {
+      _isLoadingSlots = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final api = ref.read(apiClientProvider).client;
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      final response = await api.get(
+        '/appointments/available-slots',
+        queryParameters: {'date': dateStr, 'service_id': _selectedServiceId},
+      );
+
+      setState(() {
+        _availableSlots = List<String>.from(response.data);
+      });
+    } on DioException catch (e) {
+      setState(() {
+        _errorMessage =
+            e.response?.data['detail'] ??
+            'Error cargando horarios disponibles.';
+        _availableSlots = [];
+      });
+    } finally {
+      if (mounted) setState(() => _isLoadingSlots = false);
+    }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     if (_selectedDate == null ||
-        _selectedTime == null ||
+        _selectedSlot == null ||
         _selectedServiceId == null) {
-      setState(() => _errorMessage = 'Por favor completa todos los campos.');
+      setState(() {
+        _errorMessage = 'Por favor selecciona fecha, hora y servicio.';
+      });
       return;
     }
 
@@ -62,16 +105,15 @@ class _CreateAppointmentSheetState
     });
 
     try {
-      // 1. Combinamos Date y Time y lo convertimos a formato UTC ISO 8601 para FastAPI
+      final timeParts = _selectedSlot!.split(':');
       final startDateTime = DateTime(
         _selectedDate!.year,
         _selectedDate!.month,
         _selectedDate!.day,
-        _selectedTime!.hour,
-        _selectedTime!.minute,
+        int.parse(timeParts[0]),
+        int.parse(timeParts[1]),
       ).toUtc();
 
-      // 2. Preparamos el payload
       final payload = {
         "customer_full_name": _nameController.text.trim(),
         "customer_phone": _phoneController.text.trim(),
@@ -79,13 +121,12 @@ class _CreateAppointmentSheetState
         "start_time": startDateTime.toIso8601String(),
       };
 
-      // 3. Enviamos la petición
       final api = ref.read(apiClientProvider).client;
       await api.post('/appointments/', data: payload);
 
-      // 4. ÉXITO: Forzamos la recarga del Dashboard y cerramos el modal
       ref.invalidate(appointmentsProvider);
-      if (mounted) Navigator.of(context).pop();
+
+      if (mounted) Navigator.pop(context);
     } on DioException catch (e) {
       setState(() {
         _errorMessage =
@@ -102,6 +143,58 @@ class _CreateAppointmentSheetState
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Widget _buildSlotsSelector() {
+    if (_selectedDate == null || _selectedServiceId == null) {
+      return const Text(
+        'Selecciona un servicio y una fecha para ver horarios disponibles.',
+        style: TextStyle(color: Colors.grey),
+      );
+    }
+
+    if (_isLoadingSlots) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_availableSlots.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'No hay horarios disponibles para esta fecha. Intenta con otro día.',
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Horarios Disponibles',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8.0,
+          runSpacing: 8.0,
+          children: _availableSlots.map((slot) {
+            final isSelected = _selectedSlot == slot;
+            return ChoiceChip(
+              label: Text(slot),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) setState(() => _selectedSlot = slot);
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   @override
@@ -219,7 +312,7 @@ class _CreateAppointmentSheetState
                         ),
                       )
                       .toList(),
-                  onChanged: (val) => setState(() => _selectedServiceId = val),
+                  onChanged: _onServiceChanged,
                   validator: (v) => v == null ? 'Selecciona un servicio' : null,
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -227,46 +320,27 @@ class _CreateAppointmentSheetState
               ),
               const SizedBox(height: 24),
 
-              // Selectores de Fecha y Hora
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: const Icon(Icons.calendar_today),
-                      label: Text(
-                        _selectedDate == null
-                            ? 'Fecha'
-                            : DateFormat('dd/MM/yyyy').format(_selectedDate!),
-                      ),
-                      onPressed: _pickDate,
-                    ),
+              // Selector de Fecha (Botón ancho completo)
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: const Icon(Icons.access_time),
-                      label: Text(
-                        _selectedTime == null
-                            ? 'Hora'
-                            : _selectedTime!.format(context),
-                      ),
-                      onPressed: _pickTime,
-                    ),
-                  ),
-                ],
+                ),
+                icon: const Icon(Icons.calendar_today),
+                label: Text(
+                  _selectedDate == null
+                      ? 'Seleccionar Fecha'
+                      : DateFormat('dd/MM/yyyy').format(_selectedDate!),
+                ),
+                onPressed: _pickDate,
               ),
+              const SizedBox(height: 24),
+
+              // Selector Dinámico Inteligente de Horas Disponibles
+              _buildSlotsSelector(),
+
               const SizedBox(height: 32),
 
               FilledButton(

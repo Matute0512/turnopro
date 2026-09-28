@@ -12,10 +12,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# IDEs y OS 
+# IDEs y OS
 .vscode/
 .idea/
 .DS_Store
 .agents/
 backend/app/graphify-out/
 frontend/lib/graphify-out/
+
+
+RESUMEN_SESION.md

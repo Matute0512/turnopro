@@ -44,15 +44,48 @@ class ServiceCreate(ServiceBase):
     pass
 
 
+class ServiceUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    duration_minutes: Optional[int] = Field(None, gt=0)
+    price: Optional[Decimal] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
 class ServiceResponse(ServiceBase):
     id: UUID
     is_active: bool
+    model_config = ConfigDict(from_attributes=True)
+
+# ==========================================
+# SCHEMAS DE CONFIGURACIÓN
+# ==========================================
+
+
+class BusinessSettingsUpdate(BaseModel):
+    work_days_csv: Optional[str] = None
+    open_hour: Optional[int] = None
+    close_hour: Optional[int] = None
+
+
+class BusinessSettingsResponse(BaseModel):
+    id: UUID
+    work_days_csv: str
+    open_hour: int
+    close_hour: int
     model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
 # SCHEMAS DE CITAS / TURNOS
 # ==========================================
+class CustomerResponse(BaseModel):
+    id: UUID
+    full_name: str
+    phone: str
+    email: Optional[EmailStr] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AppointmentCreate(BaseModel):
     customer_full_name: str = Field(min_length=2, max_length=150)
     customer_phone: str = Field(min_length=8, max_length=20)

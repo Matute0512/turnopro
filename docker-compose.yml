@@ -1,0 +1,38 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: turnopro_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_password
+      POSTGRES_DB: turnopro_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Verificamos que la base de datos esté lista antes de levantar la API
+      test: ["CMD-SHELL", "pg_isready -U admin -d turnopro_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./backend
+    container_name: turnopro_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://usuario_admin:REDACTED_DB_PASSWORD@localhost:5432/turnopro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  # Declaramos el volumen para la persistencia de datos
+  postgres_data:

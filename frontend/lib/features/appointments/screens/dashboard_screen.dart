@@ -103,7 +103,7 @@ class DashboardScreen extends ConsumerWidget {
                       trailing: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 8,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primaryContainer,

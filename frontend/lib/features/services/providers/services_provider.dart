@@ -14,7 +14,7 @@ class ServiceItem {
     return ServiceItem(
       id: json['id'].toString(),
       name: json['name'],
-      price: json['price'].toDouble(),
+      price: double.parse(json['price'].toString()),
     );
   }
 }

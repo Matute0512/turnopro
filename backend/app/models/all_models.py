@@ -82,3 +82,11 @@ class AuditLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="audit_logs")
+
+class BusinessSettings(Base):
+    __tablename__ = "business_settings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    work_days_csv = Column(String(50), nullable=False, default="0,1,2,3,4,5")
+    open_hour = Column(Integer, nullable=False, default=9)
+    close_hour = Column(Integer, nullable=False, default=18)

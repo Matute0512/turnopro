@@ -14,16 +14,20 @@ class ResponsiveLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = MediaQuery.of(context).size.width >= 600;
 
-    // Determinamos el índice actual en base a la ruta (útil si hay más pestañas)
-    // Por ahora, solo tenemos Inicio (0)
     final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = location == '/' ? 0 : 0;
+    final currentIndex = location.startsWith('/clientes')
+        ? 1
+        : location.startsWith('/servicios')
+        ? 2
+        : 0;
 
     void onDestinationSelected(int index) {
       if (index == 0) {
         context.go('/');
       } else if (index == 1) {
-        // En el futuro, aquí irá otra ruta, ej: context.go('/services');
+        context.go('/clientes');
+      } else if (index == 2) {
+        context.go('/servicios');
       }
     }
 
@@ -46,8 +50,13 @@ class ResponsiveLayout extends ConsumerWidget {
                   label: Text('Inicio'),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
+                  icon: Icon(Icons.people_outline),
+                  selectedIcon: Icon(Icons.people),
+                  label: Text('Clientes'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.spa_outlined),
+                  selectedIcon: Icon(Icons.spa),
                   label: Text('Servicios'),
                 ),
               ],
@@ -66,7 +75,6 @@ class ResponsiveLayout extends ConsumerWidget {
               ),
             ),
             const VerticalDivider(thickness: 1, width: 1),
-            // El child (pantalla activa) ocupa el resto del espacio
             Expanded(child: child),
           ],
         ),
@@ -86,8 +94,13 @@ class ResponsiveLayout extends ConsumerWidget {
             label: 'Inicio',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Clientes',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.spa_outlined),
+            selectedIcon: Icon(Icons.spa),
             label: 'Servicios',
           ),
         ],
