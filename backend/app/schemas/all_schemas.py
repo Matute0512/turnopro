@@ -1,9 +1,19 @@
 # app/schemas/all_schemas.py
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_serializer,
+    model_validator,
+)
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
+
+from app.core.timezones import as_utc
 
 # ==========================================
 # SCHEMAS DE USUARIO (DUEÑO/ADMIN)
@@ -62,9 +72,26 @@ class ServiceResponse(ServiceBase):
 
 
 class BusinessSettingsUpdate(BaseModel):
-    work_days_csv: Optional[str] = None
-    open_hour: Optional[int] = None
-    close_hour: Optional[int] = None
+    # 0=Lunes ... 6=Domingo. Se valida el formato para que un CSV corrupto no
+    # deje el negocio sin ningún día de atención (eso vaciaría la grilla de
+    # turnos en silencio, sin ningún error visible).
+    work_days_csv: Optional[str] = Field(
+        None,
+        pattern=r"^\s*[0-6]\s*(,\s*[0-6]\s*)*$",
+        description="Días de atención: 0=Lunes ... 6=Domingo. Ej: '0,1,2,3,4,5'",
+    )
+    open_hour: Optional[int] = Field(None, ge=0, le=23)
+    close_hour: Optional[int] = Field(None, ge=0, le=23)
+
+    @model_validator(mode="after")
+    def _rango_coherente(self):
+        if (
+            self.open_hour is not None
+            and self.close_hour is not None
+            and self.open_hour >= self.close_hour
+        ):
+            raise ValueError("open_hour debe ser menor que close_hour")
+        return self
 
 
 class BusinessSettingsResponse(BaseModel):
@@ -92,7 +119,10 @@ class AppointmentCreate(BaseModel):
     customer_email: Optional[EmailStr] = None
 
     service_id: UUID
-    start_time: datetime
+    # `AwareDatetime` exige que el cliente mande el offset explícito. Un naive
+    # es ambiguo (¿hora del local? ¿UTC?) y antes rompía con TypeError al
+    # compararse contra `datetime.now(timezone.utc)`. Sin offset -> 422.
+    start_time: AwareDatetime
 
 
 class AppointmentResponse(BaseModel):
@@ -108,3 +138,14 @@ class AppointmentResponse(BaseModel):
     customer_phone: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("start_time", "end_time")
+    def _serialize_utc(self, value: datetime):
+        """Fuerza el offset en la respuesta.
+
+        El frontend hace `DateTime.parse(...).toLocal()`: si el string viniera
+        sin offset (lo que ocurre cuando el driver devuelve un datetime naive),
+        Dart lo interpretaría como hora local del dispositivo y el turno
+        aparecería corrido varias horas en el calendario.
+        """
+        return as_utc(value).isoformat()
