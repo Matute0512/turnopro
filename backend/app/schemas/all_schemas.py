@@ -70,4 +70,8 @@ class AppointmentResponse(BaseModel):
     end_time: datetime
     price_at_booking: Decimal
     status: str
+
+    customer_full_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)

@@ -63,6 +63,14 @@ class Appointment(Base):
     customer = relationship("Customer", back_populates="appointments")
     service = relationship("Service", back_populates="appointments")
 
+    @property
+    def customer_full_name(self) -> str:
+        return self.customer.full_name if self.customer else ""
+
+    @property
+    def customer_phone(self) -> str:
+        return self.customer.phone if self.customer else ""
+
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
