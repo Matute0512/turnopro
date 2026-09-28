@@ -370,7 +370,12 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
                           ),
                           prefixIcon: const Icon(Icons.spa_outlined),
                         ),
-                        value: _selectedServiceId,
+                        // initialValue en vez de value: el dropdown administra
+                        // su propio estado y _selectedServiceId se mantiene
+                        // sincronizado por onChanged. No se resetea desde
+                        // afuera en ningun flujo, asi que no hace falta el
+                        // modo controlado.
+                        initialValue: _selectedServiceId,
                         items: services
                             .map(
                               (s) => DropdownMenuItem(

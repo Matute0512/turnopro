@@ -9,7 +9,6 @@ class CustomersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customersAsync = ref.watch(customersProvider);
-    final isDesktop = MediaQuery.of(context).size.width >= 600;
 
     return Scaffold(
       appBar: AppBar(

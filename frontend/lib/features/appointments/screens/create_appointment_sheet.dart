@@ -253,7 +253,7 @@ class _CreateAppointmentSheetState
                   decoration: BoxDecoration(
                     color: Theme.of(
                       context,
-                    ).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -344,7 +344,11 @@ class _CreateAppointmentSheetState
                     ),
                     prefixIcon: const Icon(Icons.spa_outlined),
                   ),
-                  value: _selectedServiceId,
+                  // initialValue en vez de value: el dropdown administra su
+                  // propio estado y _selectedServiceId se mantiene sincronizado
+                  // por onChanged. No se resetea desde afuera en ningun flujo,
+                  // asi que no hace falta el modo controlado.
+                  initialValue: _selectedServiceId,
                   items: services
                       .map(
                         (s) => DropdownMenuItem(
