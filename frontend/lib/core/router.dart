@@ -10,22 +10,45 @@ import '../features/services/screens/services_admin_screen.dart';
 import '../features/appointments/screens/public_booking_screen.dart';
 import '../shared/widgets/responsive_layout.dart';
 
+/// Rutas accesibles sin sesión. Se evalúan ANTES que cualquier regla de auth.
+const _publicRoutes = {'/public-booking'};
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  // El router se construye UNA sola vez. Antes se hacía
+  // `final authState = ref.watch(authProvider)` y se devolvía un GoRouter
+  // nuevo en cada cambio de sesión: eso resetea la navegación al
+  // initialLocation y rompe los deep links. Ahora los cambios de auth se
+  // propagan por refreshListenable.
+  final refresh = ValueNotifier<AuthState>(ref.read(authProvider));
+  ref.listen<AuthState>(authProvider, (_, next) => refresh.value = next);
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: '/login',
+    refreshListenable: refresh,
     redirect: (context, state) {
-      if (authState == AuthState.initial) return '/loading';
+      final authState = ref.read(authProvider);
+      final location = state.matchedLocation;
+
+      // REGLA 0: las rutas públicas son accesibles SIEMPRE, en cualquier
+      // estado de auth, incluso mientras se resuelve el storage. Si esto se
+      // evalúa después de la regla de `initial`, un deep link o un QR a
+      // /public-booking rebota a /loading y termina en el login del admin.
+      if (_publicRoutes.contains(location)) return null;
 
       final isAuth = authState == AuthState.authenticated;
-      final isGoingToLogin = state.matchedLocation == '/login';
-      final isPublic = state.matchedLocation == '/public-booking';
 
-      // Portal publico sin proteccion
-      if (isPublic) return null;
+      // Todavía no sabemos si hay sesión: pantalla de espera.
+      if (authState == AuthState.initial) {
+        return location == '/loading' ? null : '/loading';
+      }
 
-      // REGLA 1 (Zero Trust): Anónimo intentando acceder a zona protegida -> Login
+      final isGoingToLogin = location == '/login';
+
+      // Anónimo ya resuelto que quedó colgado en /loading -> Login.
+      if (!isAuth && location == '/loading') return '/login';
+
+      // REGLA 1 (Zero Trust): Anónimo en zona protegida -> Login
       if (!isAuth && !isGoingToLogin) return '/login';
 
       // REGLA 2 (UX): Usuario logueado intentando ir al Login -> Dashboard
