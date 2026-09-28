@@ -20,6 +20,7 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
 
   String? _selectedServiceId;
   DateTime? _selectedDate;
@@ -116,6 +117,9 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
       final payload = {
         "customer_full_name": _nameController.text.trim(),
         "customer_phone": _phoneController.text.trim(),
+        "customer_email": _emailController.text.trim().isEmpty
+            ? null
+            : _emailController.text.trim(),
         "service_id": _selectedServiceId,
         "start_time": startDateTime.toIso8601String(),
       };
@@ -126,9 +130,13 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
       setState(() => _success = true);
     } on DioException catch (e) {
       setState(() {
-        _errorMessage =
-            e.response?.data['detail'] ??
-            'Error de conexión o conflicto de turnos.';
+        final detail = e.response?.data?['detail'];
+        if (detail is List) {
+          _errorMessage = detail.map((err) => err['msg']).join(', ');
+        } else {
+          _errorMessage =
+              detail?.toString() ?? 'Error de conexión o conflicto de turnos.';
+        }
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -139,6 +147,7 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -184,6 +193,7 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
             return ChoiceChip(
               label: Text(slot),
               selected: isSelected,
+              showCheckmark: false,
               onSelected: (selected) {
                 if (selected) setState(() => _selectedSlot = slot);
               },
@@ -317,6 +327,18 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
                       ),
                       keyboardType: TextInputType.phone,
                       validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Tu Correo (Opcional)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.email_outlined),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 16),
                     servicesAsync.when(
