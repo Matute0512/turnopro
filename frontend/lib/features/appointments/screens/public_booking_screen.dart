@@ -30,8 +30,19 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
   String? _errorMessage;
   bool _success = false;
 
+  // El backend devuelve instantes ISO-8601 CON offset, ej.
+  // "2026-10-01T09:00:00-03:00". Guardamos el string TAL CUAL y lo reenviamos
+  // sin modificarlo: cero reconstrucción, cero desfase por zona horaria.
   List<String> _availableSlots = [];
   bool _isLoadingSlots = false;
+
+  // Descarta respuestas viejas que lleguen fuera de orden (el usuario cambia
+  // de servicio rápido y la respuesta del anterior pisaba a la actual).
+  int _slotsRequestId = 0;
+
+  /// Solo para pintar el chip: la hora real ya viene en el string.
+  String _slotLabel(String isoSlot) =>
+      DateFormat('HH:mm').format(DateTime.parse(isoSlot).toLocal());
 
   Future<void> _pickDate() async {
     final date = await showDatePicker(
@@ -60,6 +71,8 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
   Future<void> _fetchAvailableSlots() async {
     if (_selectedDate == null || _selectedServiceId == null) return;
 
+    final requestId = ++_slotsRequestId;
+
     setState(() {
       _isLoadingSlots = true;
       _errorMessage = null;
@@ -73,18 +86,26 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
         queryParameters: {'date': dateStr, 'service_id': _selectedServiceId},
       );
 
+      // setState después de un await sin este guard = "setState() called after
+      // dispose()" si el usuario navega con la request en vuelo.
+      if (!mounted || requestId != _slotsRequestId) return;
+
       setState(() {
-        _availableSlots = List<String>.from(response.data);
+        _availableSlots = List<String>.from(response.data as List);
+        _isLoadingSlots = false;
       });
     } on DioException catch (e) {
+      if (!mounted || requestId != _slotsRequestId) return;
+
       setState(() {
-        _errorMessage =
-            e.response?.data['detail'] ??
-            'Error cargando horarios disponibles.';
+        // `data` puede no ser un Map (ej. HTML de un proxy): no indexar a ciegas.
+        final detail = e.response?.data is Map ? e.response?.data['detail'] : null;
+        _errorMessage = detail is List
+            ? detail.map((err) => err['msg']).join(', ')
+            : detail?.toString() ?? 'Error cargando horarios disponibles.';
         _availableSlots = [];
+        _isLoadingSlots = false;
       });
-    } finally {
-      if (mounted) setState(() => _isLoadingSlots = false);
     }
   }
 
@@ -105,15 +126,10 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
     });
 
     try {
-      final timeParts = _selectedSlot!.split(':');
-      final startDateTime = DateTime(
-        _selectedDate!.year,
-        _selectedDate!.month,
-        _selectedDate!.day,
-        int.parse(timeParts[0]),
-        int.parse(timeParts[1]),
-      ).toUtc();
-
+      // ZERO-TRUST TEMPORAL: se reenvía el instante EXACTO que devolvió
+      // /available-slots. Se eliminó el DateTime(y, m, d, h, min).toUtc() que
+      // reconstruía la hora en la zona del dispositivo: era el origen del
+      // desfase de 3 horas entre los chips ofrecidos y los turnos aceptados.
       final payload = {
         "customer_full_name": _nameController.text.trim(),
         "customer_phone": _phoneController.text.trim(),
@@ -121,16 +137,17 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
             ? null
             : _emailController.text.trim(),
         "service_id": _selectedServiceId,
-        "start_time": startDateTime.toIso8601String(),
+        "start_time": _selectedSlot,
       };
 
       final api = ref.read(apiClientProvider).client;
       await api.post('/appointments/', data: payload);
 
-      setState(() => _success = true);
+      if (mounted) setState(() => _success = true);
     } on DioException catch (e) {
+      if (!mounted) return;
       setState(() {
-        final detail = e.response?.data?['detail'];
+        final detail = e.response?.data is Map ? e.response?.data['detail'] : null;
         if (detail is List) {
           _errorMessage = detail.map((err) => err['msg']).join(', ');
         } else {
@@ -191,7 +208,9 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
           children: _availableSlots.map((slot) {
             final isSelected = _selectedSlot == slot;
             return ChoiceChip(
-              label: Text(slot),
+              // El chip pinta la hora local, pero el valor que se envía es el
+              // instante ISO completo que devolvió el backend.
+              label: Text(_slotLabel(slot)),
               selected: isSelected,
               showCheckmark: false,
               onSelected: (selected) {
@@ -240,7 +259,8 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
       );
     }
 
-    final servicesAsync = ref.watch(servicesListProvider);
+    // Solo servicios activos: el backend rechaza con 404 los desactivados.
+    final servicesAsync = ref.watch(activeServicesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -355,7 +375,10 @@ class _PublicBookingScreenState extends ConsumerState<PublicBookingScreen> {
                             .map(
                               (s) => DropdownMenuItem(
                                 value: s.id,
-                                child: Text('${s.name} (\$${s.price})'),
+                                child: Text(
+                                  '${s.name} (\$${s.price.toStringAsFixed(2)}'
+                                  ' · ${s.durationMinutes}min)',
+                                ),
                               ),
                             )
                             .toList(),
