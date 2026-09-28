@@ -7,15 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.all_schemas import BusinessSettingsUpdate, BusinessSettingsResponse
 from app.repositories.base import BaseRepository
-from app.models.all_models import BusinessSettings, User
+from app.models.all_models import (
+    DEFAULT_CLOSE_HOUR,
+    DEFAULT_OPEN_HOUR,
+    DEFAULT_WORK_DAYS_CSV,
+    BusinessSettings,
+    User,
+)
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 settings_repo = BaseRepository(BusinessSettings)
 
-DEFAULT_WORK_DAYS_CSV = "0,1,2,3,4,5"
-DEFAULT_OPEN_HOUR = 9
-DEFAULT_CLOSE_HOUR = 20
+# Los defaults viven en app/models/all_models.py (única fuente de verdad) y se
+# re-exportan acá: antes este módulo y la capa de servicios tenían cada uno su
+# propia copia, y una decía 18 y la otra 20.
 
 
 @router.get("/", response_model=BusinessSettingsResponse)

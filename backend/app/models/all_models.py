@@ -83,10 +83,24 @@ class AuditLog(Base):
 
     user = relationship("User", back_populates="audit_logs")
 
+# ==========================================
+# DEFAULTS DE NEGOCIO (única fuente de verdad)
+# ==========================================
+# Los consumen el modelo, el endpoint de settings y la capa de servicios.
+# Antes estaban duplicados en tres lugares y con valores distintos (18 y 20),
+# así que un local sin configuración creada atendía hasta las 20:00 y uno con
+# configuración hasta las 18:00. Al definirlos acá, importarlos desde el modelo
+# no puede volver a desincronizarse.
+DEFAULT_WORK_DAYS_CSV = "0,1,2,3,4,5"  # Lun-Sab
+DEFAULT_OPEN_HOUR = 9
+DEFAULT_CLOSE_HOUR = 18
+
+
 class BusinessSettings(Base):
     __tablename__ = "business_settings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    work_days_csv = Column(String(50), nullable=False, default="0,1,2,3,4,5")
-    open_hour = Column(Integer, nullable=False, default=9)
-    close_hour = Column(Integer, nullable=False, default=18)
+    work_days_csv = Column(
+        String(50), nullable=False, default=DEFAULT_WORK_DAYS_CSV)
+    open_hour = Column(Integer, nullable=False, default=DEFAULT_OPEN_HOUR)
+    close_hour = Column(Integer, nullable=False, default=DEFAULT_CLOSE_HOUR)

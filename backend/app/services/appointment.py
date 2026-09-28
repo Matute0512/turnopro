@@ -9,7 +9,14 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
 from app.core.timezones import as_utc, business_tz, to_business
-from app.models.all_models import Appointment, BusinessSettings, Service
+from app.models.all_models import (
+    DEFAULT_CLOSE_HOUR,
+    DEFAULT_OPEN_HOUR,
+    DEFAULT_WORK_DAYS_CSV,
+    Appointment,
+    BusinessSettings,
+    Service,
+)
 from app.repositories.appointment import appointment_repo
 from app.repositories.base import BaseRepository
 from app.repositories.customer import customer_repo
@@ -33,9 +40,12 @@ class AppointmentService:
         """Devuelve (work_days, open_hour, close_hour) con defaults seguros."""
         settings_list = await settings_repo.get_multi(db, limit=1)
 
-        work_days = [0, 1, 2, 3, 4, 5]  # Lun-Sab por defecto (Argentina)
-        open_h = 9
-        close_h = 20
+        # Defaults de negocio: única fuente de verdad en app/models/all_models.py
+        work_days = [
+            int(d) for d in DEFAULT_WORK_DAYS_CSV.split(",") if d.strip().isdigit()
+        ]
+        open_h = DEFAULT_OPEN_HOUR
+        close_h = DEFAULT_CLOSE_HOUR
 
         if settings_list:
             sett = settings_list[0]
