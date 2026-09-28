@@ -74,41 +74,74 @@ class _ServicesAdminScreenState extends ConsumerState<ServicesAdminScreen> {
                     ? null
                     : () async {
                         if (!formKey.currentState!.validate()) return;
+
+                        // double.parse/int.parse lanzan FormatException, que NO
+                        // es una DioException: se escapaba del catch de abajo,
+                        // no mostraba SnackBar y dejaba la pantalla en rojo.
+                        // Se normaliza la coma decimal (entrada es-AR).
+                        final price = double.tryParse(
+                          priceCtrl.text.trim().replaceAll(',', '.'),
+                        );
+                        final duration = int.tryParse(durationCtrl.text.trim());
+
+                        // Se capturan ANTES del await: este `context` es el del
+                        // StatefulBuilder del diálogo, no el del State, así que
+                        // el `mounted` del State no lo protege.
+                        final messenger = ScaffoldMessenger.of(context);
+                        final navigator = Navigator.of(context);
+
+                        if (price == null ||
+                            (service == null &&
+                                (duration == null || duration <= 0))) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Precio o duración inválidos.'),
+                            ),
+                          );
+                          setState(() => isLoading = false);
+                          return;
+                        }
+
                         setState(() => isLoading = true);
+                        // Si el diálogo se cierra, su StatefulBuilder queda
+                        // desmontado: resetear isLoading tiraría
+                        // "setState() called after dispose()".
+                        var closed = false;
                         try {
                           final api = ref.read(apiClientProvider).client;
                           if (service == null) {
                             await api.post(
                               '/services/',
                               data: {
-                                'name': nameCtrl.text,
-                                'price': double.parse(priceCtrl.text),
-                                'duration_minutes': int.parse(
-                                  durationCtrl.text,
-                                ),
+                                'name': nameCtrl.text.trim(),
+                                'price': price,
+                                'duration_minutes': duration,
                               },
                             );
                           } else {
                             await api.put(
                               '/services/${service.id}',
                               data: {
-                                'name': nameCtrl.text,
-                                'price': double.parse(priceCtrl.text),
+                                'name': nameCtrl.text.trim(),
+                                'price': price,
                               },
                             );
                           }
                           ref.invalidate(servicesListProvider);
-                          if (mounted) Navigator.pop(context);
-                        } on DioException catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Error: ${e.response?.data ?? e.message}',
-                              ),
-                            ),
+                          navigator.pop();
+                          closed = true;
+                        } catch (e) {
+                          // catch amplio a propósito: ya no puede haber
+                          // FormatException acá, y un fallo de red debe verse
+                          // igual que un error de validación del backend.
+                          final message = e is DioException
+                              ? '${e.response?.data ?? e.message}'
+                              : '$e';
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Error: $message')),
                           );
                         } finally {
-                          if (mounted) setState(() => isLoading = false);
+                          if (!closed) setState(() => isLoading = false);
                         }
                       },
                 child: isLoading
