@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/appointments/screens/dashboard_screen.dart';
+import '../shared/widgets/responsive_layout.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Observamos el estado de autenticación reactivamente
@@ -31,11 +32,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/', builder: (context, state) => const DashboardScreen()),
       GoRoute(
         path: '/loading',
         builder: (context, state) =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
+      ),
+      ShellRoute(
+        builder: (context, state, child) => ResponsiveLayout(child: child),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const DashboardScreen(),
+          ),
+        ],
       ),
     ],
   );

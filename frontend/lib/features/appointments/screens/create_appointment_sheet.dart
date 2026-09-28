@@ -112,9 +112,9 @@ class _CreateAppointmentSheetState
       // Padding dinámico para que el teclado no tape el formulario
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16,
-        right: 16,
-        top: 24,
+        left: 24,
+        right: 24,
+        top: 16,
       ),
       child: Form(
         key: _formKey,
@@ -123,33 +123,78 @@ class _CreateAppointmentSheetState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Agendar Nuevo Turno',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              // Indicador de arrastre (Drag handle)
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              Text(
+                'Agendar Nuevo Turno',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
               if (_errorMessage != null)
                 Container(
-                  padding: const EdgeInsets.all(8),
-                  color: Colors.red.shade100,
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(color: Colors.red.shade900),
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Nombre Completo del Cliente',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.person_outline),
                 ),
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
 
               TextFormField(
                 controller: _phoneController,
-                decoration: const InputDecoration(labelText: 'Teléfono'),
+                decoration: InputDecoration(
+                  labelText: 'Teléfono',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                ),
                 keyboardType: TextInputType.phone,
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
               ),
@@ -158,8 +203,12 @@ class _CreateAppointmentSheetState
               // Dropdown reactivo de Servicios
               servicesAsync.when(
                 data: (services) => DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Seleccionar Servicio',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.spa_outlined),
                   ),
                   value: _selectedServiceId,
                   items: services
@@ -173,16 +222,22 @@ class _CreateAppointmentSheetState
                   onChanged: (val) => setState(() => _selectedServiceId = val),
                   validator: (v) => v == null ? 'Selecciona un servicio' : null,
                 ),
-                loading: () => const CircularProgressIndicator(),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, st) => Text('Error cargando servicios: $e'),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
               // Selectores de Fecha y Hora
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                       icon: const Icon(Icons.calendar_today),
                       label: Text(
                         _selectedDate == null
@@ -192,9 +247,15 @@ class _CreateAppointmentSheetState
                       onPressed: _pickDate,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                       icon: const Icon(Icons.access_time),
                       label: Text(
                         _selectedTime == null
@@ -206,15 +267,34 @@ class _CreateAppointmentSheetState
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-              ElevatedButton(
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: _isLoading ? null : _submit,
                 child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Confirmar Turno'),
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Confirmar Turno',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
             ],
           ),
         ),

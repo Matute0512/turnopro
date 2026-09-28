@@ -17,11 +17,10 @@ class Appointment {
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
     return Appointment(
-      // Usamos .toString() para blindar el código.
-      // Si el backend manda un int, lo pasa a texto. Si manda un UUID, lo deja como texto.
       id: json['id'].toString(),
-      customerFullName: json['customer_full_name'],
-      customerPhone: json['customer_phone'],
+      // Absorción de nulos para prevenir el TypeError fatal
+      customerFullName: json['customer_full_name'] ?? 'Cliente Desconocido',
+      customerPhone: json['customer_phone'] ?? 'Sin Teléfono',
       startTime: DateTime.parse(json['start_time']).toLocal(),
       serviceId: json['service_id'].toString(),
     );

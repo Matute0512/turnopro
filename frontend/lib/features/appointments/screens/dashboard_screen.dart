@@ -14,56 +14,130 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Escuchamos el estado de la petición de turnos
     final appointmentsAsyncValue = ref.watch(appointmentsProvider);
+    final isDesktop = MediaQuery.of(context).size.width >= 600;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Turnos Programados'),
+        centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión',
-            onPressed: () {
-              // Esto actualiza el estado y GoRouter nos expulsa al Login
-              ref.read(authProvider.notifier).logout();
-            },
-          ),
+          // Solo mostramos el logout en el AppBar si es mobile.
+          // En desktop está en el NavigationRail.
+          if (!isDesktop)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Cerrar sesión',
+              onPressed: () {
+                ref.read(authProvider.notifier).logout();
+              },
+            ),
         ],
       ),
-      // .when() garantiza que la UI responda a los 3 estados de la red
       body: appointmentsAsyncValue.when(
         data: (appointments) {
           if (appointments.isEmpty) {
-            return const Center(child: Text('No hay turnos agendados.'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.event_busy,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No hay turnos agendados.',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: appointments.length,
             itemBuilder: (context, index) {
               final apt = appointments[index];
-              // Formateamos la fecha usando el paquete intl
-              final formattedTime = DateFormat(
-                'dd/MM/yyyy HH:mm',
-              ).format(apt.startTime);
+              final formattedDate = DateFormat('dd MMM').format(apt.startTime);
+              final formattedTime = DateFormat('HH:mm').format(apt.startTime);
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(
-                    apt.customerFullName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                child: Card(
+                  elevation: 0,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  subtitle: Text(
-                    'Servicio ID: ${apt.serviceId} \nTel: ${apt.customerPhone}',
-                  ),
-                  trailing: Text(
-                    formattedTime,
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w600,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
+                        child: Text(
+                          apt.customerFullName.isNotEmpty
+                              ? apt.customerFullName[0].toUpperCase()
+                              : '?',
+                        ),
+                      ),
+                      title: Text(
+                        apt.customerFullName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          'Servicio: ${apt.serviceId}\nTel: ${apt.customerPhone}',
+                        ),
+                      ),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              formattedTime,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              formattedDate,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer
+                                    .withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      isThreeLine: true,
                     ),
                   ),
-                  isThreeLine: true,
                 ),
               );
             },
@@ -74,33 +148,45 @@ class DashboardScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(context).colorScheme.error,
+                size: 48,
+              ),
               const SizedBox(height: 16),
               Text('Error al cargar turnos: $error'),
               const SizedBox(height: 16),
-              ElevatedButton(
-                // Forzamos a Riverpod a reejecutar la petición HTTP
+              FilledButton.icon(
                 onPressed: () => ref.invalidate(appointmentsProvider),
-                child: const Text('Reintentar'),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
               ),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled:
-                true, // Permite que el modal ocupe más altura si es necesario
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      floatingActionButton: isDesktop
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateSheet(context),
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo Turno'),
+            )
+          : FloatingActionButton(
+              onPressed: () => _showCreateSheet(context),
+              child: const Icon(Icons.add),
             ),
-            builder: (context) => const CreateAppointmentSheet(),
-          );
-        },
-        child: const Icon(Icons.add),
+    );
+  }
+
+  void _showCreateSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (context) => const CreateAppointmentSheet(),
     );
   }
 }
