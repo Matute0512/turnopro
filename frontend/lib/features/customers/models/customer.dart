@@ -14,10 +14,13 @@ class Customer {
 
   factory Customer.fromJson(Map<String, dynamic> json) {
     return Customer(
-      id: json['id'],
-      fullName: json['full_name'],
-      phone: json['phone'],
-      email: json['email'],
+      // Casteo defensivo, consistente con Appointment y ServiceItem: un cambio
+      // de tipo (o un null) del lado del backend no debe tumbar la pantalla con
+      // un TypeError en runtime. La API devuelve el id como UUID -> String.
+      id: json['id'].toString(),
+      fullName: (json['full_name'] ?? 'Cliente sin nombre').toString(),
+      phone: (json['phone'] ?? '').toString(),
+      email: json['email'] as String?,
     );
   }
 }
