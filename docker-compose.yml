@@ -7,9 +7,9 @@ services:
     container_name: turnopro_db
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin_password
-      POSTGRES_DB: turnopro_db
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD no definido - copiar .env.example a .env}
+      POSTGRES_DB: ${POSTGRES_DB:-turnopro_db}
     ports:
       - "5432:5432"
     volumes:
@@ -28,7 +28,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://usuario_admin:REDACTED_DB_PASSWORD@localhost:5432/turnopro
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL no definida - copiar .env.example a .env}
     depends_on:
       db:
         condition: service_healthy
